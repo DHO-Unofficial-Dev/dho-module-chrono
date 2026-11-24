@@ -1,0 +1,85 @@
+{
+  "formatVersion": 1,
+  "moduleId": "app.dhoport.chrono",
+  "name": "Chrono",
+  "version": "1.0.0",
+  "description": "타롯과 기간제 아이템의 남은 시간을 한눈에 확인합니다.",
+  "publisher": {
+    "id": "app.dhoport",
+    "name": "DHO PORT"
+  },
+  "license": "MPL-2.0",
+  "minimumManagerVersion": "2.2.2",
+  "sdkVersion": "1",
+  "capabilities": [
+    "services.consume",
+    "storage.local",
+    "actions.receive"
+  ],
+  "surfaces": [
+    {
+      "surfaceId": "module.app.dhoport.chrono.panel",
+      "name": "panel",
+      "label": "Chrono",
+      "contractVersion": 1,
+      "presentation": "panel",
+      "preferredSize": {
+        "width": 600,
+        "height": 760
+      },
+      "html": "surfaces/panel/index.html",
+      "css": "surfaces/panel/main.css",
+      "entry": "surfaces/panel/main.js"
+    },
+    {
+      "surfaceId": "module.app.dhoport.chrono.hud",
+      "name": "hud",
+      "label": "Chrono HUD",
+      "contractVersion": 1,
+      "presentation": "hud",
+      "interactionMode": "interactive",
+      "preferredSize": {
+        "width": 40,
+        "height": 40
+      },
+      "maximumSize": {
+        "width": 1280,
+        "height": 720
+      },
+      "defaultPlacement": {
+        "anchor": "top-right",
+        "offsetX": -24,
+        "offsetY": 120
+      },
+      "html": "surfaces/hud/index.html",
+      "css": "surfaces/hud/main.css",
+      "entry": "surfaces/hud/main.js"
+    }
+  ],
+  "serviceDependencies": [
+    {
+      "dependencyId": "vault",
+      "contractId": "org.dho.vault.items",
+      "contractVersion": 1,
+      "label": "Vault 라이브러리",
+      "description": "모듈 관리에서 제공자를 연결하고 아이템 읽기를 승인해 주세요.",
+      "requestedScopes": [
+        "items.read"
+      ],
+      "optional": false
+    }
+  ],
+  "dockIcon": "assets/dock-icon.svg",
+  "actions": [
+    {
+      "actionId": "focus-hud",
+      "label": "Chrono HUD 조작",
+      "description": "HUD로 포커스를 옮겨 타이머를 조작합니다. 단축키는 Navigator에서 지정합니다.",
+      "target": {
+        "kind": "surface",
+        "surfaceId": "module.app.dhoport.chrono.hud"
+      },
+      "allowGlobalShortcut": true
+    }
+  ]
+}

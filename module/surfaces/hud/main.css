@@ -1,0 +1,80 @@
+:root{--surface:var(--dho-host-bg,#101a28);--ink:var(--dho-host-ink,#e9edf3);--accent:var(--dho-host-accent,#c8b48b);--muted:var(--dho-host-muted,#98a5b8);--line:var(--dho-host-line,#384456);--size:48px;--gap:10px;--thickness:1.5px;--time-size:12px}
+*{box-sizing:border-box}[hidden]{display:none!important}html,body{margin:0;background:transparent;color:var(--ink);font:12px/1.4 var(--dho-host-font-sans, "Segoe UI", "Malgun Gothic", system-ui, sans-serif)}body{overflow:hidden}button,input{font:inherit}button{cursor:pointer;color:var(--ink);background:var(--surface);border:1px solid var(--line);border-radius:4px;padding:6px 9px}button:hover:enabled{border-color:var(--accent)}button:focus-visible,input:focus-visible{outline:2px solid var(--accent);outline-offset:-2px}button:disabled{cursor:default;opacity:.55}
+#hud{--cell-size:var(--size);width:max-content;min-width:40px;min-height:40px;max-width:min(1280px,100vw);max-height:min(720px,100vh);overflow:auto;scrollbar-width:thin;scrollbar-color:var(--muted) var(--surface)}
+#content{width:max-content;min-width:40px;min-height:40px}
+#group{width:max-content;min-width:40px;padding:4px max(4px,calc(var(--gap)/2));border-radius:5px;background:color-mix(in srgb,var(--surface) var(--opacity,88%),transparent)}
+#group-name{contain:inline-size;max-width:none;margin:0 0 5px;overflow:hidden;white-space:nowrap;text-overflow:ellipsis;font:11px/16px var(--dho-host-font-sans, "Segoe UI", "Malgun Gothic", system-ui, sans-serif);color:#fff;text-shadow:-1px 0 #000,1px 0 #000,0 -1px #000,0 1px #000}
+#timers{display:grid;gap:var(--gap);width:max-content;align-items:start}#empty{width:176px;margin:0;color:var(--muted)}
+.timer{position:relative;display:flex;flex-direction:column;align-items:center;width:var(--cell-size);padding:0;border:0;background:transparent;border-radius:5px;gap:2px}.frame{position:relative;display:grid;place-items:center;width:var(--size);height:var(--size);border-radius:5px;background:var(--surface);box-shadow:inset 0 0 10px #0006}.art{display:grid;place-items:center;position:absolute;inset:5px;color:var(--accent);font-size:16px}.art img{width:100%;height:100%;object-fit:contain}.frame svg{position:absolute;inset:0;width:100%;height:100%;fill:none;pointer-events:none}.frame rect{stroke-width:var(--gauge-stroke)}.track{stroke:var(--line)}.gauge{stroke:var(--accent);stroke-linecap:round}.remaining{font:var(--time-size)/1.4 var(--dho-host-font-sans, "Segoe UI", "Malgun Gothic", system-ui, sans-serif);white-space:nowrap;text-shadow:-1px 0 #000,1px 0 #000,0 -1px #000,0 1px #000;max-width:none}.timer[data-phase=expired] .frame{filter:grayscale(1);opacity:.4}.timer[data-phase=idle] .art{opacity:.65}.timer[data-phase=paused] .gauge{stroke:var(--muted)}.timer[data-phase=paused] .remaining{color:var(--accent)}
+#menu,#notice{width:260px;padding:10px;background:var(--surface);border:1px solid var(--line);border-radius:5px;overflow-wrap:anywhere}#menu header{display:flex;align-items:start;gap:8px;margin-bottom:8px}#menu h2{font-size:12px;margin:0;flex:1}#menu header button{padding:1px 6px;color:var(--muted)}.menu-time{color:var(--accent);font:12px/1.5 var(--dho-host-font-sans, "Segoe UI", "Malgun Gothic", system-ui, sans-serif);margin:0 0 8px}.actions{display:flex;gap:5px;flex-wrap:wrap}.edit{margin:9px 0 0;padding-top:9px;border-top:1px solid var(--line)}.edit label{display:block;color:var(--muted);margin-bottom:4px}.edit div{display:flex;gap:5px}.edit input{min-width:0;width:100%;padding:5px;color:var(--ink);background:transparent;border:1px solid var(--line);border-radius:4px}.confirm{margin-top:8px}.confirm p,#notice p{margin:0 0 8px}#notice button{margin-right:5px}#notice{color:var(--ink)}
+
+.remaining{display:flex;flex-wrap:wrap;width:calc(var(--size) + var(--gap));justify-content:center;align-items:baseline;gap:0 2px;color:#fff}
+.time-part{display:inline-flex;align-items:baseline;gap:1px}
+.time-value{color:#fff;font-weight:600;font-variant-numeric:tabular-nums}
+.time-unit{color:var(--accent);font-size:1em;font-weight:600}
+.pause-mark{display:none;position:absolute;right:3px;top:2px;color:var(--accent);font-size:11px;background:var(--surface);padding:0 2px;border-radius:2px}
+.timer[data-phase=paused] .pause-mark{display:block}
+
+.remaining,.menu-time{font-variant-numeric:tabular-nums}
+
+input[type=number]{appearance:textfield;-moz-appearance:textfield}
+input[type=number]::-webkit-inner-spin-button,input[type=number]::-webkit-outer-spin-button{-webkit-appearance:none;margin:0}
+
+#menu .duration-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:5px}
+#menu .duration-grid label{min-width:0;margin:0}
+#menu .duration-grid input{width:100%}
+
+.duration-editor{margin:14px 0 0;padding:0;border:0;min-width:0}
+.duration-editor legend{font-size:12px;color:var(--muted);margin-bottom:6px;padding:0}
+.duration-grid,.duration{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:6px}
+.duration-grid label{min-width:0;margin:0;font-size:12px;color:var(--muted)}
+.duration-grid input{min-width:0;width:100%;padding:7px 4px;margin-top:4px}
+#menu .duration-editor{margin:0}
+
+/* 메뉴 방향은 그룹 설정을 따르고 닫으면 아이콘 크기로 복귀한다. */
+#content{display:grid;grid-template-areas:"group" "menu" "notice";align-items:start}
+#group{grid-area:group}#menu{grid-area:menu}#notice{grid-area:notice}
+#content[data-menu-open=true]{gap:4px}
+#content[data-menu-open=true][data-menu-direction=top]{grid-template-areas:"menu" "group" "notice"}
+#content[data-menu-open=true][data-menu-direction=left]{grid-template-areas:"menu group" "notice notice"}
+#content[data-menu-open=true][data-menu-direction=right]{grid-template-areas:"group menu" "notice notice"}
+
+/* 시간은 작은 숫자 입력과 단위를 한 줄에 표시한다. */
+.duration-editor .duration-grid,.duration-grid.duration{display:flex;flex-wrap:nowrap;align-items:center;gap:7px}
+.duration-editor .duration-grid label,.duration-grid.duration label{display:flex;align-items:baseline;gap:2px;margin:0;min-width:0;font-size:13px;color:var(--accent);white-space:nowrap}
+.duration-editor .duration-grid input,.duration-grid.duration input{font:inherit;font-variant-numeric:tabular-nums;width:2.7ch;min-width:0;flex:none;margin:0;padding:3px 1px;border:0;border-bottom:1px solid var(--line);border-radius:0;background:transparent;color:var(--ink);text-align:center}
+.duration-editor .duration-grid .duration-days input,.duration-grid.duration .duration-days input{width:3.7ch}
+.duration-grid input:focus{border-bottom-color:var(--accent)}
+
+#menu .duration-grid{display:flex;gap:7px}#menu .duration-grid input{width:2.7ch;margin:0;padding:3px 1px}#menu .duration-grid .duration-days input{width:3.7ch}
+.timer[data-phase=paused] .art{filter:saturate(.4);opacity:.78}
+.pause-mark{width:16px;height:16px;font-size:12px;font-weight:700;line-height:16px;text-align:center;border:1px solid var(--accent);color:var(--accent);background:var(--surface);padding:0}
+
+/* 우클릭 메뉴는 좁은 세로 목록으로 시작하고 시간 편집만 펼친다. */
+#menu{width:208px;padding:6px}
+#menu header{align-items:center;gap:6px;margin:0;padding:5px 5px 2px}
+#menu h2{font-size:12px;min-width:0;overflow-wrap:anywhere}
+#menu header button{border:0;background:transparent;padding:2px 4px;font-size:11px}
+#menu .menu-time{margin:0;padding:0 5px 6px;font-size:11px;color:var(--muted)}
+#menu .actions{display:flex;flex-direction:column;gap:1px}
+#menu .actions button,#menu .edit-toggle{width:100%;border:0;padding:7px 8px;text-align:left;background:transparent}
+#menu .actions button:hover:enabled,#menu .edit-toggle:hover:enabled{background:color-mix(in srgb,var(--accent) 12%,transparent)}
+#menu hr{border:0;border-top:1px solid var(--line);margin:5px 2px}
+#menu .edit-toggle[aria-expanded=true]{color:var(--accent)}
+#menu .edit-toggle::after{content:'›';float:right;color:var(--muted)}
+#menu .edit-toggle[aria-expanded=true]::after{content:'⌄'}
+#menu .edit{border:0;margin:0;padding:5px}
+#menu .edit .primary{width:100%;margin-top:9px;border-color:var(--accent);background:var(--accent);color:var(--surface);font-weight:600}
+#menu .confirm{border:1px solid var(--line);border-radius:4px;padding:7px;margin:4px 0}
+#menu .confirm p{font-size:11px}
+#menu .confirm button{font-size:11px;padding:4px 6px;margin-right:4px}
+
+/* 동작은 프레임 내부 그림과 게이지에만 적용하고 배치 치수는 유지한다. */
+.frame{overflow:hidden}
+#hud[data-motion=true] .gauge{transition:stroke-dasharray .45s linear}
+@media(prefers-reduced-motion:reduce){#hud .gauge{transition:none}}
+
+/* 그림·게이지를 함께 움직여도 입력 칸·시간·스크롤 크기는 고정한다. */
+#group{overflow:clip}
+.frame{pointer-events:none}
+.remaining,#group-name{position:relative;z-index:3;pointer-events:none}

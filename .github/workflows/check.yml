@@ -1,0 +1,33 @@
+name: 검사와 빌드
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1
+        with:
+          node-version: '22'
+          package-manager-cache: false
+      - name: 로직 테스트
+        run: npm test
+      - name: 공개 SDK 준비
+        env:
+          SDK_SHA256: d757790359defcc5a575150490d7c71b8a97ed622dae1f12c54e2c009b0b0f44
+        run: |
+          curl --fail --location --retry 3 --output /tmp/chrono-sdk.zip https://github.com/DHO-Unofficial-Dev/DHO-Manager/releases/download/v2.2.2/dho-module-node-tools.zip
+          echo "$SDK_SHA256  /tmp/chrono-sdk.zip" | sha256sum --check
+          unzip -q /tmp/chrono-sdk.zip -d .tools
+      - name: 모듈 검사와 패키징
+        run: npm run build -- .tools
