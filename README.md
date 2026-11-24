@@ -27,7 +27,7 @@ Chrono에 자주 쓰는 아이템을 등록해 두면 게임 화면의 작은 �
 
 DHO Navigator **2.2.2 이상**과 **Vault** 모듈이 필요해요.
 
-설치 파일은 릴리즈 준비 중입니다. 공개 후 아래 순서로 설치할 수 있어요.
+[Chrono 1.0.0](https://github.com/DHO-Unofficial-Dev/dho-module-chrono/releases/tag/v1.0.0)이 공개되었습니다. 아래 순서로 설치해 주세요.
 
 1. [Releases](https://github.com/DHO-Unofficial-Dev/dho-module-chrono/releases)에서 `chrono-1.0.0.dho-module`을 받아 Navigator의 모듈 관리에서 설치하세요.
 2. [Vault](https://dhoport.app/navigator/catalog/module/app.dhoport.vault)를 설치하고 게임 폴더를 설정하세요.
