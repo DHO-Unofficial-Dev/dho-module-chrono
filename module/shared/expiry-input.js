@@ -11,7 +11,7 @@ export function parseLocalDateTime(value) {
   return Number.isSafeInteger(time) && localDateTime(time) === (value.length === 16 ? `${value}:00` : value) ? time : null;
 }
 export function expiryInput(parent, timer) {
-  let maximum=timer.durationMs, paused=timer.status==='paused';
+  let maximum=timer.durationMs, paused=timer.status==='paused', disabled=false;
   const element=document.createElement('fieldset');element.className='expiry-editor';
   const legend=document.createElement('legend');legend.textContent='시간 보정';element.append(legend);
   const mode=document.createElement('select');mode.setAttribute('aria-label','시간 입력 방식');
@@ -33,10 +33,15 @@ export function expiryInput(parent, timer) {
     if(delta<0||delta>maximum){hint.textContent='현재부터 기본 기간 이내의 만료 일시를 입력하세요.';return;}
     const minutes=Math.floor(delta/60000);hint.textContent=`${Math.floor(minutes/1440)}일 ${Math.floor(minutes%1440/60)}시간 ${minutes%60}분 남음 · PC 현지 시간${paused?' · 저장 후에도 일시정지 유지':''}`;
   }
+  function applyDisabled() {
+    mode.disabled=disabled;
+    for(const node of dateWrap.querySelectorAll('input,button'))node.disabled=disabled||mode.value!=='expires';
+    duration.setDisabled(disabled||mode.value!=='remaining');
+  }
   function setTimer(value) {paused=value.status==='paused';maximum=value.durationMs;const stamp=localDateTime(value.status==='running'?value.expiresAt:Date.now()+remainingMs(value,Date.now()));input.value=stamp.slice(0,10);time.value=stamp.slice(11);duration.setValue(remainingMs(value,Date.now()));preview();}
-  mode.addEventListener('change',()=>{dateWrap.hidden=mode.value!=='expires';duration.element.hidden=mode.value!=='remaining';preview();element.dispatchEvent(new Event('change',{bubbles:true}));});input.addEventListener('input',preview);time.addEventListener('input',preview);
-  setTimer(timer);
-  return {element,setTimer,setMaximum(value){maximum=value;duration.setMaximum(value);},setDisabled(value){for(const n of element.querySelectorAll('input,select,button'))n.disabled=value;},read(){
+  mode.addEventListener('change',()=>{dateWrap.hidden=mode.value!=='expires';duration.element.hidden=mode.value!=='remaining';applyDisabled();preview();element.dispatchEvent(new Event('change',{bubbles:true}));});input.addEventListener('input',preview);time.addEventListener('input',preview);
+  setTimer(timer);applyDisabled();
+  return {element,setTimer,setMaximum(value){maximum=value;duration.setMaximum(value);},setDisabled(value){disabled=value;applyDisabled();},read(){
     if(mode.value==='remaining'){const value=duration.read();return value===null?null:{remainingMs:value};}
     const target=readDate(), delta=target===null?null:target-Date.now();
     if(delta===null||delta<0||delta>maximum){input.setCustomValidity('현재부터 기본 기간 이내의 만료 일시를 입력하세요.');input.reportValidity();return null;}
