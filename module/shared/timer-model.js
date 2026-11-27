@@ -64,7 +64,7 @@ function cleanTimer(timer) {
 export function createState() {
   return { schemaVersion: 1, groups: [{ id: DEFAULT_GROUP_ID, name: '기본 그룹', visible: true,
     showName: true, transparency: 12, direction: 'row', menuDirection: 'bottom', count: 4, timerIds: [] }],
-  timers: [], style: { size: 48, gap: 10, thickness: 1.5, gauge: true, timeSize: 12, motion: true, easterEggs: true }, soundRef: 'default' };
+  timers: [], startLinks: [], style: { size: 48, gap: 10, thickness: 1.5, gauge: true, timeSize: 12, motion: true, easterEggs: true }, soundRef: 'default' };
 }
 export function validateState(value) {
   require(record(value));
@@ -83,7 +83,14 @@ export function validateState(value) {
     assigned.add(id.toLowerCase());
   }
   require(assigned.size === timers.length);
-  return { schemaVersion: 1, groups, timers, style: cleanStyle(value.style), soundRef: value.soundRef };
+  const startLinks = value.startLinks === undefined ? [] : value.startLinks;
+  require(Array.isArray(startLinks) && startLinks.length <= 50);
+  const linked = new Set();
+  for (const members of startLinks) {
+    require(Array.isArray(members) && members.length >= 2 && members.length <= 100);
+    for (const id of members) {require(timers.some(timer => timer.id === id) && !linked.has(id));linked.add(id);}
+  }
+  return { schemaVersion: 1, groups, timers, startLinks: startLinks.map(ids => [...ids]), style: cleanStyle(value.style), soundRef: value.soundRef };
 }
 export function remainingMs(timer, now) {
   nowValue(now);
@@ -110,6 +117,20 @@ export function reduce(value, command, now) {
   const timerById = id => { const timer = state.timers.find(timer => timer.id === id); require(timer); return timer; };
   const detach = id => { for (const group of state.groups) group.timerIds = group.timerIds.filter(entry => entry !== id); };
   switch (command.type) {
+    case 'link-start': {
+      const timer = timerById(command.id);
+      if (command.expectedVersion !== timer.version) fail('timer-conflict');
+      require(Array.isArray(command.ids) && command.ids.length <= 99 && new Set(command.ids).size === command.ids.length && !command.ids.includes(timer.id));
+      const old = state.startLinks.find(ids => ids.includes(timer.id)) ?? [timer.id];
+      const next = [timer.id, ...command.ids];
+      for (const id of next) {timerById(id);require(!state.startLinks.some(ids => ids !== old && ids.includes(id)));}
+      state.startLinks = state.startLinks.filter(ids => ids !== old);
+      const removed = old.filter(id => !next.includes(id));
+      if (removed.length > 1) state.startLinks.push(removed);
+      if (next.length > 1) state.startLinks.push(next);
+      for (const id of new Set([...old, ...next])) timerById(id).version += 1;
+      break;
+    }
     case 'add': {
       const timer = cleanTimer(command.timer);
       require(timer.version === 1);
@@ -121,7 +142,11 @@ export function reduce(value, command, now) {
       const timer = timerById(command.id);
       if (command.expectedVersion !== timer.version) fail('timer-conflict');
       if (command.type === 'remove') {
-        detach(timer.id); state.timers = state.timers.filter(entry => entry.id !== timer.id); break;
+        detach(timer.id);
+        const linked = state.startLinks.find(ids => ids.includes(timer.id));
+        for (const id of linked ?? []) if(id !== timer.id) timerById(id).version += 1;
+        state.startLinks = state.startLinks.map(ids => ids.filter(id => id !== timer.id)).filter(ids => ids.length > 1);
+        state.timers = state.timers.filter(entry => entry.id !== timer.id); break;
       }
       const currentPhase = phase(timer, now);
       if (command.type === 'settings') {
@@ -134,6 +159,13 @@ export function reduce(value, command, now) {
       } else if (command.type === 'start') {
         timer.status = 'running'; timer.expiresAt = now + timer.durationMs;
         timer.remainingMs = null; timer.runId = crypto.randomUUID();
+        const linked = state.startLinks.find(ids => ids.includes(timer.id)) ?? [];
+        for (const id of linked) {
+          if(id === timer.id)continue;
+          const other = timerById(id);
+          if(!['idle','expired'].includes(phase(other,now)))continue;
+          other.status='running';other.expiresAt=now+other.durationMs;other.remainingMs=null;other.runId=crypto.randomUUID();other.version+=1;
+        }
       } else if (command.type === 'pause') {
         require(currentPhase === 'running' && timer.kind === 'tarot');
         timer.remainingMs = Math.min(timer.durationMs, remainingMs(timer, now));

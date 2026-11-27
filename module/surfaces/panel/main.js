@@ -22,7 +22,7 @@ const timerControls = $('timer-controls');
 let closed = false, debounce, rowsToken = '', lastDetail = null, lastSaveResult = null, registerButton = null;
 let cachedSelection = null, kindSelectionId = null;
 let registrationGroupId = null, controlSequence = 0;
-let timerDrag = null, lastMotionSettings = null;
+let timerDrag = null, lastMotionSettings = null, linkingId = null;
 let preset = null, selectedId = null, pending = false, controlsPhase = null;
 let category = '전체', adding = false, selectingPreset = 0;
 const rows = new Map(), iconUrls = new Map();
@@ -236,7 +236,7 @@ function renderQuickActions(timer, entry) {
     notice.append(button('다시 시작 확인',()=>void dispatch(command(timer,'start'))),button('취소',()=>{notice.hidden=true;actions.querySelector('[data-timer-action="start"]')?.focus();}));notice.hidden=false;
   });actionIcon(start,currentPhase==='idle'?'play':'restart',currentPhase==='idle'?'시작':'다시 시작');start.dataset.timerAction='start';start.disabled=!timerStore.ready;actions.append(stop,start);
 }
-function toggleTimerSettings(id) {selectedId=selectedId===id?null:id;renderControls();}
+function toggleTimerSettings(id) {linkingId=null;renderLinks();selectedId=selectedId===id?null:id;renderControls();}
 function clearDragIndicators() {
   for(const entry of document.querySelectorAll('.timer-entry[data-drop-position]')) delete entry.dataset.dropPosition;
 }
@@ -319,13 +319,40 @@ function renderTimers() {
       const row=button('',async()=>{const p=phase(timer,Date.now());if(p==='idle'||p==='expired')await dispatch(command(timer,'start'),'타이머를 시작했습니다.');else toggleTimerSettings(id);});row.className='timer-row';
       const icon=el('span','—','icon'),name=el('span',timer.name),time=el('strong');time.dataset.timerTime=id;const copy=el('span',undefined,'timer-copy');name.className='timer-name';name.title=timer.name;const remaining=el('span',undefined,'timer-remaining'),bar=el('span',undefined,'timer-bar'),fill=el('span');bar.setAttribute('aria-hidden','true');bar.append(fill);remaining.append(bar,time);copy.append(name,remaining);row.append(icon,copy);
       const settings=button('⋯',()=>toggleTimerSettings(id));settings.className='timer-menu';settings.setAttribute('aria-label',`${timer.name} 설정 펼치기`);settings.setAttribute('aria-expanded',String(selectedId===id));settings.setAttribute('aria-controls','timer-controls');
+      const linked=timerStore.state.startLinks.find(ids=>ids.includes(id));
+      const link=button('',()=>{selectedId=null;renderControls();linkingId=linkingId===id?null:id;renderLinks();});link.className='timer-link';link.dataset.linkTimer=id;link.setAttribute('aria-label',`${timer.name} 동시 시작 연결`);link.setAttribute('aria-pressed',String(Boolean(linked)));link.title=linked?`동시 시작 연결 · ${linked.length}개`:'동시 시작 연결';link.disabled=!timerStore.ready;
+      const chain=document.createElementNS('http://www.w3.org/2000/svg','svg');chain.setAttribute('viewBox','0 0 24 24');chain.setAttribute('aria-hidden','true');const path=document.createElementNS(chain.namespaceURI,'path');path.setAttribute('d','M10 13a5 5 0 0 0 7 0l3-3a5 5 0 0 0-7-7l-2 2M14 11a5 5 0 0 0-7 0l-3 3a5 5 0 0 0 7 7l2-2');chain.append(path);link.append(chain);
       const quick=el('div',undefined,'timer-quick'),notice=el('div',undefined,'timer-confirmation');notice.hidden=true;
-      header.append(createDragHandle(timer,group,entry),row,quick,settings);entry.append(header,notice);renderQuickActions(timer,entry);section.append(entry);void attachIcon(icon,timer.item.iconHandle);
+      header.append(createDragHandle(timer,group,entry),row,quick,link,settings);entry.append(header,notice);renderQuickActions(timer,entry);section.append(entry);void attachIcon(icon,timer.item.iconHandle);
     }
     const add=button('＋ 아이템 추가',()=>openAdd(group.id));add.className='add-item-card';add.dataset.groupId=group.id;add.setAttribute('aria-label',`${group.name}에 아이템 추가`);add.disabled=!timerStore.ready;section.append(add);
     $('timer-list').append(section);
   }
-  updateTimes();renderControls();
+  updateTimes();renderControls();renderLinks();
+}
+function renderLinks() {
+  for(const panel of document.querySelectorAll('.link-editor'))panel.remove();
+  for(const button of document.querySelectorAll('.timer-link'))button.setAttribute('aria-expanded',String(button.dataset.linkTimer===linkingId));
+  const timer=timerStore.state.timers.find(t=>t.id===linkingId);
+  if(!timer){linkingId=null;return;}
+  const entry=[...document.querySelectorAll('.timer-entry')].find(e=>e.dataset.timerId===timer.id);if(!entry)return;
+  const members=timerStore.state.startLinks.find(ids=>ids.includes(timer.id))??[timer.id];
+  const panel=el('section',undefined,'link-editor');panel.setAttribute('aria-label',`${timer.name} 동시 시작 연결 설정`);
+  panel.append(el('h3','함께 시작할 아이템'),el('p','대기·만료된 항목만 각자의 기본 기간으로 시작합니다. 실행 중·일시정지 항목은 유지합니다.','muted'));
+  const choices=el('div',undefined,'link-choices');
+  for(const other of timerStore.state.timers){
+    if(other.id===timer.id)continue;
+    const foreign=timerStore.state.startLinks.some(ids=>ids!==members&&ids.includes(other.id));
+    const row=el('label',undefined,'link-choice'),check=el('input');check.type='checkbox';check.value=other.id;check.checked=members.includes(other.id);check.disabled=foreign;
+    const group=timerStore.state.groups.find(g=>g.timerIds.includes(other.id));
+    row.append(check,el('span',`${other.name} · ${group?.name??''}${foreign?' · 다른 연결에 포함':''}`));choices.append(row);
+  }
+  panel.append(choices);
+  if(timerStore.state.timers.length<2)panel.append(el('p','아이템을 하나 더 등록하면 연결할 수 있습니다.','muted'));
+  const save=button('연결 저장',async()=>{const ids=[...choices.querySelectorAll('input:checked')].map(input=>input.value);const result=await dispatch(command(timer,'link-start',{ids}),'동시 시작 연결을 저장했습니다.');if(result.ok){linkingId=null;renderLinks();}});
+  save.disabled=!timerStore.ready;
+  const unlink=button('이 항목 연결 해제',async()=>{const result=await dispatch(command(timer,'link-start',{ids:[]}),'연결을 해제했습니다.');if(result.ok){linkingId=null;renderLinks();}});unlink.disabled=members.length<2||!timerStore.ready;
+  const buttons=el('div',undefined,'link-buttons');buttons.append(save,unlink,button('닫기',()=>{linkingId=null;renderLinks();}));panel.append(buttons);entry.append(panel);
 }
 function updateTimes() {
   for(const node of document.querySelectorAll('[data-timer-time]')) {const timer=timerStore.state.timers.find(t=>t.id===node.dataset.timerTime);if(!timer)continue;const now=Date.now(),currentPhase=phase(timer,now);
