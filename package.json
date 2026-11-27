@@ -1,6 +1,6 @@
 {
   "name": "dho-module-chrono",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "private": true,
   "type": "module",
   "description": "DHO Navigator용 타롯·기간제 아이템 타이머",

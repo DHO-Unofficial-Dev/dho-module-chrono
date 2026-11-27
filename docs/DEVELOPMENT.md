@@ -22,7 +22,7 @@ npm test
 npm run build -- /path/to/dho-module-node-tools
 ```
 
-빌드 스크립트가 소스 검사, archive 생성, archive 검증을 순서대로 수행합니다. 결과는 `dist/chrono-1.0.0.dho-module`과 `dist/SHA256SUMS.txt`입니다. SDK가 계산한 최소 버전보다 manifest의 최소 버전이 높다는 경고는 Navigator 2.2.2의 HUD 동작을 대상으로 하므로 유지합니다.
+빌드 스크립트가 소스 검사, archive 생성, archive 검증을 순서대로 수행합니다. 결과는 `dist/chrono-1.1.0.dho-module`과 `dist/SHA256SUMS.txt`입니다. SDK가 계산한 최소 버전보다 manifest의 최소 버전이 높다는 경고는 Navigator 2.2.2의 HUD 동작을 대상으로 하므로 유지합니다.
 
 CI도 같은 SDK 파일을 SHA-256으로 확인한 뒤 테스트와 빌드를 수행합니다. SDK를 갱신할 때는 앱 호환성과 함께 워크플로의 버전·체크섬을 갱신하세요.
 
