@@ -125,7 +125,7 @@ export function reduce(value, command, now) {
       }
       const currentPhase = phase(timer, now);
       if (command.type === 'settings') {
-        require(record(command.patch) && Object.keys(command.patch).every(key => ['name', 'durationMs', 'alerts'].includes(key)));
+        require(record(command.patch) && Object.keys(command.patch).every(key => ['name', 'durationMs', 'alerts', 'kind'].includes(key)));
         if (Object.hasOwn(command.patch, 'durationMs') && command.patch.durationMs !== timer.durationMs)
           require(currentPhase === 'idle' || currentPhase === 'expired');
         Object.assign(timer, command.patch);
@@ -135,16 +135,19 @@ export function reduce(value, command, now) {
         timer.status = 'running'; timer.expiresAt = now + timer.durationMs;
         timer.remainingMs = null; timer.runId = crypto.randomUUID();
       } else if (command.type === 'pause') {
-        require(currentPhase === 'running');
+        require(currentPhase === 'running' && timer.kind === 'tarot');
         timer.remainingMs = Math.min(timer.durationMs, remainingMs(timer, now));
         timer.status = 'paused'; timer.expiresAt = null;
       } else if (command.type === 'resume') {
         require(currentPhase === 'paused');
         timer.expiresAt = now + timer.remainingMs; timer.remainingMs = null; timer.status = 'running';
       } else {
-        require(currentPhase !== 'idle' && integer(command.remainingMs, 0, timer.durationMs));
-        if (currentPhase === 'paused' && command.remainingMs > 0) timer.remainingMs = command.remainingMs;
-        else { timer.status = 'running'; timer.remainingMs = null; timer.expiresAt = now + command.remainingMs; }
+        const hasExpiry = Object.hasOwn(command, 'expiresAt');
+        require(!hasExpiry || (!Object.hasOwn(command, 'remainingMs') && integer(command.expiresAt, now, Number.MAX_SAFE_INTEGER)));
+        const left = hasExpiry ? command.expiresAt - now : command.remainingMs;
+        require(currentPhase !== 'idle' && integer(left, 0, timer.durationMs));
+        if (currentPhase === 'paused' && left > 0) timer.remainingMs = left;
+        else { timer.status = 'running'; timer.remainingMs = null; timer.expiresAt = now + left; }
       }
       timer.version += 1;
       break;

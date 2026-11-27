@@ -3,7 +3,7 @@ import { storage, surface, actions } from '@dho/sdk';
 import { TimerStore } from '../../shared/timer-store.js';
 import { phase, remainingMs, formatRemaining } from '../../shared/timer-model.js';
 import { renderTimeLabel, fitTimeLabel } from '../../shared/time-label.js';
-import { durationInput } from '../../shared/duration-input.js';
+import { expiryInput } from '../../shared/expiry-input.js';
 import { createBlobReader } from '../../shared/blob-reader.js';
 import { createRareScheduler, createMotionPlayer, nearExpiry } from '../../shared/hud-motion.js';
 import { observeMotionPreview } from '../../shared/motion-preview.js';
@@ -146,6 +146,7 @@ function makeRow(timer) {
     if (!current || !store.ready || pending) return;
     const currentPhase=phase(current,Date.now());
     if(selected)closeMenu();
+    if(currentPhase==='running'&&current.kind!=='tarot'){openMenu(current.id);return;}
     void act(current.id,['idle','expired'].includes(currentPhase)?'start':currentPhase==='paused'?'resume':'pause');
   });
   node.className = 'timer';
@@ -207,7 +208,7 @@ function tick() {
     if(!store.state.groups[0].visible||document.hidden||reducedMotion.matches||store.state.style.motion===false)row.pendingMotion=null;
     row.runId=timer.runId;row.node.dataset.phase = current; row.node.disabled = !store.ready || pending;
     row.node.title = `${timer.name} · ${label}${current === 'paused' ? ' · 일시정지' : ''}`;
-    row.node.setAttribute('aria-label', `${row.node.title} · ${['idle','expired'].includes(current) ? '시작' : current==='paused'?'재개':'일시정지'} · 우클릭으로 메뉴`);
+    row.node.setAttribute('aria-label', `${row.node.title} · ${['idle','expired'].includes(current) ? '시작' : current==='paused'?'재개':timer.kind==='tarot'?'일시정지':'메뉴'} · 우클릭으로 메뉴`);
     renderTimeLabel(row.label,label);
     fitTimeLabel(row.label,store.state.style.size+store.state.style.gap,store.state.style.timeSize);
     row.gauge.setAttribute('stroke-dasharray', `${Math.min(100,remainingMs(timer,now)/timer.durationMs*100)} 100`);
@@ -253,20 +254,20 @@ function openMenu(id) {
   const separator = el('hr');
   let editOpened = false;
   const form = el('form',undefined,'edit'); form.id = 'remaining-editor'; form.hidden = true;
-  editToggle = button('남은 시간 편집', () => {
-    if(!editOpened){const current=store.state.timers.find(t=>t.id===id);if(current)editInput.setValue(remainingMs(current,Date.now()));editOpened=true;}
+  editToggle = button('시간 보정', () => {
+    if(!editOpened){const current=store.state.timers.find(t=>t.id===id);if(current)editInput.setTimer(current);editOpened=true;}
     form.hidden = !form.hidden; editToggle.setAttribute('aria-expanded',String(!form.hidden));
     if (!form.hidden) { reveal(form); form.querySelector('input')?.focus({preventScroll:true}); }
     else scheduleSize();
   });
-  editToggle.className = 'edit-toggle'; editToggle.setAttribute('aria-label','남은 시간 편집'); editToggle.setAttribute('aria-controls',form.id); editToggle.setAttribute('aria-expanded','false');
-  editInput = durationInput(form,'남은 시간',remainingMs(timer,Date.now()),{maximum:timer.durationMs});
+  editToggle.className = 'edit-toggle'; editToggle.setAttribute('aria-label','시간 보정'); editToggle.setAttribute('aria-controls',form.id); editToggle.setAttribute('aria-expanded','false');
+  editInput = expiryInput(form,timer);editInput.element.addEventListener('change',()=>scheduleSize());
   const save = el('button','적용'); save.type = 'submit'; save.className = 'primary'; form.append(save);
   form.addEventListener('submit', event => {
     event.preventDefault();const current=store.state.timers.find(t=>t.id===id);
     if(!current)return;
-    editInput.setMaximum(current.durationMs);const ms=editInput.read();if(ms===null)return;
-    void act(id,'edit',{remainingMs:ms});
+    editInput.setMaximum(current.durationMs);const patch=editInput.read();if(!patch)return;
+    void act(id,'edit',patch);
   });
   menu.append(header,menuTime,actions,confirmation,separator,editToggle,form); updateMenu(); reveal(menu);
 }
@@ -276,7 +277,7 @@ function updateMenu() {
   if (!timer) { closeMenu(); return; }
   const current = phase(timer,Date.now());
   $('menu-title').textContent = timer.name; menuTime.textContent = `${formatRemaining(timer,Date.now())}${current === 'paused' ? ' · 일시정지' : ''}`;
-  pauseButton.hidden = !['running','paused'].includes(current);
+  pauseButton.hidden = current!=='paused' && (timer.kind!=='tarot' || current!=='running');
   pauseButton.textContent = current === 'paused' ? '재개' : '일시정지';
   startButton.textContent = ['idle','expired'].includes(current) ? '시작' : '다시 시작';
   for (const node of $('menu').querySelectorAll('button,input')) node.disabled = pending || !store.ready;

@@ -5,6 +5,8 @@ import { ItemStore } from '../../shared/item-store.js';
 import { TimerStore } from '../../shared/timer-store.js';
 import { remainingMs, phase, formatRemaining } from '../../shared/timer-model.js';
 import { renderTimeLabel, fitTimeLabel } from '../../shared/time-label.js';
+import { expiryInput } from '../../shared/expiry-input.js';
+import { suggestedTimerKind } from '../../shared/timer-kind.js';
 import { registrationCommand } from '../../shared/registration.js';
 import { createPresetBrowser } from '../../shared/preset-browser.js';
 import { PRESETS, CATEGORIES } from '../../shared/presets.js';
@@ -18,7 +20,7 @@ import { createBlobReader } from '../../shared/blob-reader.js';
 const $ = id => document.getElementById(id);
 const timerControls = $('timer-controls');
 let closed = false, debounce, rowsToken = '', lastDetail = null, lastSaveResult = null, registerButton = null;
-let cachedSelection = null;
+let cachedSelection = null, kindSelectionId = null;
 let registrationGroupId = null, controlSequence = 0;
 let timerDrag = null, lastMotionSettings = null;
 let preset = null, selectedId = null, pending = false, controlsPhase = null;
@@ -51,11 +53,11 @@ function cancelPendingSelection() {
   selectingPreset++; clearTimeout(debounce); presetBrowser.cancel();
   clearRegistrationSelection(); picker.invalidateSearch();
 }
-function registrationInput(item) { if (!item || !timerStore.state.groups.some(group=>group.id===registrationGroupId) || (preset && !samePresetItem(item))) throw new Error('invalid-registration'); return { groupId: registrationGroupId, name: $('alias').value.trim() || undefined, kind: preset?.kind || 'item', durationMs:joinDuration(['days','hours','minutes','seconds'].map(id=>$(id).value===''?NaN:Number($(id).value))), mode: $('mode').value, remainingMs:joinDuration(['remaining-days','remaining-hours','remaining-minutes','remaining-seconds'].map(id=>$(id).value===''?NaN:Number($(id).value))), expiresAt: new Date($('expires').value).getTime() }; }
+function registrationInput(item) { if (!item || !timerStore.state.groups.some(group=>group.id===registrationGroupId) || (preset && !samePresetItem(item))) throw new Error('invalid-registration'); return { groupId: registrationGroupId, name: $('alias').value.trim() || undefined, kind: $('timer-kind').value, durationMs:joinDuration(['days','hours','minutes','seconds'].map(id=>$(id).value===''?NaN:Number($(id).value))), mode: $('mode').value, remainingMs:joinDuration(['remaining-days','remaining-hours','remaining-minutes','remaining-seconds'].map(id=>$(id).value===''?NaN:Number($(id).value))), expiresAt: new Date($('expires').value).getTime() }; }
 async function registerItem(item, draft) { try { draft ??= registrationInput(item); const cmd = registrationCommand({...draft,item}); cmd.cacheRegistrationId = item.registrationId; return await timerStore.dispatch(cmd); } catch { return {ok:false,error:{code:'invalid-registration'}}; } }
 function setDuration(ms) { splitDuration(ms).forEach((value,i)=>{$(['days','hours','minutes','seconds'][i]).value=String(value);}); }
-function resetPreset() { preset = null; setDuration(0); for (const id of ['days','hours','minutes','seconds']) $(id).disabled = false; $('kind-note').textContent = '일반 아이템 · 1분부터 366일까지 직접 입력하세요.'; }
-function applyPresetTo(name) { if (!preset) return; if (name.replace(/\s/g,'').toLowerCase() !== preset.name.replace(/\s/g,'').toLowerCase()) { resetPreset(); return; } setDuration(preset.durationMs); for (const id of ['days','hours','minutes','seconds']) $(id).disabled = preset.kind === 'tarot'; $('kind-note').textContent = preset.kind === 'tarot' ? '타롯 · 3시간 고정 · 수동 일시정지' : '추천 기간을 적용했습니다. 실제 아이템 설명을 확인하세요.'; }
+function resetPreset() { kindSelectionId=null; $('timer-kind').value='item'; preset = null; setDuration(0); for (const id of ['days','hours','minutes','seconds']) $(id).disabled = false; $('kind-note').textContent = '일반 아이템 · 1분부터 366일까지 직접 입력하세요.'; }
+function applyPresetTo(name) { if (!preset) return; if (name.replace(/\s/g,'').toLowerCase() !== preset.name.replace(/\s/g,'').toLowerCase()) { resetPreset(); return; } $('timer-kind').value=preset.kind; setDuration(preset.durationMs); for (const id of ['days','hours','minutes','seconds']) $(id).disabled = preset.kind === 'tarot'; $('kind-note').textContent = preset.kind === 'tarot' ? '타롯 · 3시간 고정 · 수동 일시정지' : '추천 기간을 적용했습니다. 실제 아이템 설명을 확인하세요.'; }
 function image(icon) {
   const img = document.createElement('img'); img.alt = ''; img.src = `data:image/png;base64,${icon.base64}`;
   img.width = icon.width; img.height = icon.height; return img;
@@ -82,7 +84,15 @@ function openAdd(groupId=timerStore.state.groups[0]?.id) {
   $('remaining-field').hidden=true; $('expires-field').hidden=true; $('search-results').hidden=true;
   $('presets').hidden=false;showTab('register'); showStep(false); renderPresets(); void picker.refresh(); void loadPresets(true);
 }
+function setRegistrationKind(kind) {
+  $('timer-kind').value=kind;
+  if(kind==='tarot')setDuration(10800000);
+  for(const id of ['days','hours','minutes','seconds'])$(id).disabled=kind==='tarot';
+  $('kind-note').textContent=kind==='tarot'?'타롯 · 3시간 · 수동 일시정지 가능':'일반 아이템 · 일시정지 없이 만료 일시까지 계산합니다.';
+}
+$('timer-kind').addEventListener('change',()=>setRegistrationKind($('timer-kind').value));
 function showSelected(item, icon) {
+  if(kindSelectionId!==item.id){kindSelectionId=item.id;setRegistrationKind(preset?.kind ?? suggestedTimerKind(item));}
   const heading=el('div',undefined,'detail-heading'), imageSlot=el('span','—','icon');
   if(icon)imageSlot.replaceChildren(image(icon)); else if(item.iconHandle)void attachIcon(imageSlot,item.iconHandle);
   heading.append(imageSlot,el('h3',item.name)); $('detail').replaceChildren(heading);
@@ -217,7 +227,7 @@ function renderQuickActions(timer, entry) {
   {
     const pause=button(currentPhase==='paused'?'재개':'일시정지',()=>void dispatch(command(timer,currentPhase==='paused'?'resume':'pause')));
     actionIcon(pause,currentPhase==='paused'?'play':'pause',currentPhase==='paused'?'재개':'일시정지');
-    pause.disabled=!['running','paused'].includes(currentPhase)||!timerStore.ready;actions.append(pause);
+    pause.disabled=!['running','paused'].includes(currentPhase)||!timerStore.ready;if(timer.kind==='tarot'||currentPhase==='paused')actions.append(pause);
   }
   const stop=button('정지',()=>void dispatch(command(timer,'stop')));actionIcon(stop,'stop','정지');stop.disabled=currentPhase==='idle'||!timerStore.ready;
   const start=button(currentPhase==='idle'?'시작':'다시 시작',()=>{
@@ -333,7 +343,11 @@ function renderControls() {
   for(const card of document.querySelectorAll('.timer-entry')) {const open=Boolean(timer&&entry&&card===entry);card.classList.toggle('settings-open',open);card.querySelector('.timer-menu').setAttribute('aria-expanded',String(open));}
   if(!timer||!entry){selectedId=null;return;}
   entry.append(panel);panel.append(el('h3','타이머 설정'));
-  if(timer.status!=='idle') {const remaining=durationInput(panel,'남은 시간',remainingMs(timer,Date.now()),{maximum:timer.durationMs});panel.append(button('남은 시간 저장',()=>{const ms=remaining.read();if(ms!==null)void dispatch(command(timer,'edit',{remainingMs:ms}));}));}
+  if(timer.status!=='idle') {const editor=expiryInput(panel,timer);panel.append(button('시간 보정 저장',()=>{const patch=editor.read();if(patch)void dispatch(command(timer,'edit',patch));}));}
+  if(timer.kind==='item'&&timer.status==='paused')panel.append(el('p','이전 버전에서 일시정지한 항목입니다. 재개 후에는 다시 일시정지할 수 없습니다.','muted'));
+  const kindLabel=el('label','종류'),kind=el('select');for(const [value,text]of [['item','일반 아이템'],['tarot','타롯 · 일시정지 가능']]){const option=el('option',text);option.value=value;kind.append(option);}kind.value=timer.kind;kindLabel.append(kind);panel.append(kindLabel);
+  const kindSave=button('종류 저장',()=>{const next=kind.value;void dispatch(command(timer,'settings',{patch:{kind:next,...(next==='tarot'?{durationMs:10800000,alerts:{...timer.alerts,leadMinutes:timer.alerts.leadMinutes.filter(v=>v<=180)}}:{})}}));});
+  const updateKind=()=>{kindSave.disabled=kind.value==='tarot'&&timer.durationMs!==10800000&&!['idle','expired'].includes(phase(timer,Date.now()));};kind.addEventListener('change',updateKind);updateKind();panel.append(kindSave,el('p','타롯은 3시간입니다. 다른 기간으로 실행 중인 항목은 정지 후 타롯으로 바꿀 수 있습니다.','muted'));
   const name=field(panel,'별명',timer.name);name.maxLength=120;
   const locked=timer.status!=='idle'||timer.kind==='tarot';
   const duration=durationInput(panel,'기본 기간',timer.durationMs,{minimum:60000,disabled:locked});

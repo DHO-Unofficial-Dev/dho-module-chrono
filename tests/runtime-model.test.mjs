@@ -51,7 +51,7 @@ test('타로 일시정지는 저장 복원·편집·재개에서 유지한다', 
   assert.equal(resumed.timers[0].runId, state.timers[0].runId);
   const expired = act(edited, 'edit', { remainingMs: 0 }); assert.equal(phase(expired.timers[0], 1000), 'expired');
   invalid(() => act(expired, 'pause'));
-  assert.equal(act(act(add(), 'start'), 'pause').timers[0].status,'paused');
+  invalid(() => act(act(add(), 'start'), 'pause'));
 });
 test('남은 시간 편집은 기본 기간을 보존하고 잘못된 전이는 거부한다', () => {
   invalid(() => act(add(), 'edit', { remainingMs: 100 }));
@@ -164,9 +164,9 @@ test('드래그 후 다른 타이머 순서가 바뀌면 위치를 조용히 덮
   assert.deepEqual(reduce(state,drag,1000).groups[0].timerIds,[order[1],order[2],order[0],order[3]]);
 });
 
-test('직접 등록한 아이템도 일시정지 저장 복원과 재개를 지원한다',()=>{
+test('이전 버전에서 일시정지한 일반 아이템은 보존하고 재개 뒤에는 다시 정지할 수 없다',()=>{
   const running=act(add(fixture({durationMs:30*86400000})), 'start');
-  const paused=act(running,'pause',{},61000);
+  const paused=structuredClone(running);Object.assign(paused.timers[0],{status:'paused',expiresAt:null,remainingMs:30*86400000-60000});
   const restored=validateState(JSON.parse(JSON.stringify(paused)));
   const left=30*86400000-60000;
   assert.equal(remainingMs(restored.timers[0],999999999999),left);
@@ -174,7 +174,7 @@ test('직접 등록한 아이템도 일시정지 저장 복원과 재개를 지�
   assert.equal(edited.timers[0].status,'paused');
   const resumed=act(edited,'resume',{},999000);
   assert.equal(resumed.timers[0].expiresAt,4600000);
-  assert.equal(resumed.timers[0].kind,'item');
+  assert.equal(resumed.timers[0].kind,'item');invalid(()=>act(resumed,'pause',{},999000));
   assert.equal(resumed.timers[0].runId,running.timers[0].runId);
   invalid(()=>act(add(),'pause'));
   invalid(()=>act(edited,'pause'));
@@ -185,4 +185,26 @@ test('기존 그룹은 메뉴 아래 방향으로 복원하며 네 방향만 저
   assert.equal(validateState(old).groups[0].menuDirection,'bottom');
   for(const menuDirection of ['top','bottom','left','right'])assert.equal(reduce(old,{type:'group-update',id:DEFAULT_GROUP_ID,patch:{menuDirection}},0).groups[0].menuDirection,menuDirection);
   invalid(()=>reduce(old,{type:'group-update',id:DEFAULT_GROUP_ID,patch:{menuDirection:'auto'}},0));
+});
+
+test('만료 일시 보정은 저장 시각과 실행 ID를 보존하며 중복 입력과 범위 밖을 거절한다',()=>{
+ const running=act(add(),'start');
+ const fixed=act(running,'edit',{expiresAt:51000},10000);
+ assert.equal(fixed.timers[0].expiresAt,51000);assert.equal(fixed.timers[0].runId,running.timers[0].runId);
+ assert.equal(fixed.timers[0].durationMs,MINUTE);
+ for(const expiresAt of [9999,70001,NaN,Infinity,10000.5])invalid(()=>act(running,'edit',{expiresAt},10000));
+ invalid(()=>act(running,'edit',{expiresAt:51000,remainingMs:1},10000));
+ assert.equal(phase(act(running,'edit',{expiresAt:10000},10000).timers[0],10000),'expired');
+});
+test('일시정지 타롯의 만료 일시 입력은 저장 당시 남은 시간으로 바꾸며 정지를 유지한다',()=>{
+ let state=act(add(fixture({kind:'tarot',durationMs:180*MINUTE})),'start');state=act(state,'pause');
+ const fixed=act(state,'edit',{expiresAt:61000},1000);assert.equal(fixed.timers[0].status,'paused');assert.equal(fixed.timers[0].remainingMs,60000);
+ assert.equal(act(fixed,'resume',{},9000).timers[0].expiresAt,69000);
+});
+test('종류 변경은 기존 실행 시각을 보존하고 타롯은 3시간만 허용한다',()=>{
+ const state=act(add(fixture({durationMs:180*MINUTE})),'start');
+ const tarot=act(state,'settings',{patch:{kind:'tarot'}});assert.equal(tarot.timers[0].expiresAt,state.timers[0].expiresAt);
+ assert.equal(act(tarot,'pause').timers[0].status,'paused');
+ invalid(()=>act(add(),'settings',{patch:{kind:'tarot'}}));
+ const idle=act(add(),'settings',{patch:{kind:'tarot',durationMs:180*MINUTE}});assert.equal(idle.timers[0].kind,'tarot');
 });
